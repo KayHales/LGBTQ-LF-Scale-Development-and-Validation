@@ -1,0 +1,1 @@
+# LGBTQ-LF-Scale-Development-and-Validation
