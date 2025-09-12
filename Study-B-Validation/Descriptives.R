@@ -1,121 +1,97 @@
-# Descriptives 
+# --- Packages ---
+library(dplyr)
+library(psych)
+library(apaTables)
+
+# --- Common settings ---
+likert_levels <- c(
+  "Strongly disagree",
+  "Somewhat disagree",
+  "Neither agree nor disagree",
+  "Somewhat agree",
+  "Strongly agree"
+)
+
+belong_items <- c("Q14","Q15","Q21","Q17","Q18","Q19","Q20")
+util_items   <- c("Q22","Q23","Q24","Q25","Q26")
+cfa_items    <- paste0("Q", 14:26)
+
+# --- Descriptives for LGBTQ-LF ---
 cfa_data <- data %>%
-  select(
-    Gender,
-    Sexuality,
-    Age, 
-    Party,
-    Educ,
-    Metro,
-    Q14,
-    Q15,
-    Q16,
-    Q17,
-    Q18,
-    Q19,
-    Q20,
-    Q22,
-    Q23,
-    Q24,
-    Q25,
-    Q26
-  )
-
-cfa_data <- cfa_data %>%
-  mutate_at(vars(Q14:Q26), 
-            ~factor(., levels = c("Strongly disagree", 
-                                  "Somewhat disagree", 
-                                  "Neither agree nor disagree", 
-                                  "Somewhat agree", 
-                                  "Strongly agree")))
-
-cfa_data <- cfa_data %>%
-  select(Q14:Q26) %>%
-  drop_na
+  select(Gender, Sexuality, Age, Party, Educ, Metro, all_of(cfa_items)) %>%
+  mutate(across(all_of(cfa_items),
+                ~ factor(.x, levels = likert_levels, ordered = TRUE))) %>%
+  select(all_of(cfa_items)) %>%
+  tidyr::drop_na()
 
 describe(cfa_data)
 
-# Scale Descriptive 
+# --- Scale Descriptives ---
+# Belonging
 belong_data <- valid_data %>%
-  select(Q14:Q21)
-belong_data <- belong_data %>%
-  mutate(belong_score = rowMeans(select(., Q14:Q21), na.rm = TRUE))
-apa.cor.table(belong_data, 
-                        show.conf.interval = F,
-                        filename = "belongtable.doc")
-describe(belong_data, skew = TRUE, ranges = TRUE)
+  select(all_of(belong_items)) %>%
+  mutate(across(everything(),
+                ~ factor(.x, levels = likert_levels, ordered = TRUE))) %>%
+  mutate(across(everything(), ~ as.numeric(.x))) %>%
+  mutate(belong_score = rowMeans(across(all_of(belong_items)), na.rm = TRUE))
 
+apa.cor.table(belong_data %>% select(all_of(belong_items)),
+              show.conf.interval = FALSE,
+              filename = "belongtable.doc")
+describe(belong_data %>% select(all_of(belong_items)),
+         skew = TRUE, ranges = TRUE)
 
-util_data <- valid_data %>%
-  select(Q22:Q26)
-util_data <- util_data %>%
-  mutate(util_score = rowMeans(select(., Q22:Q26), na.rm = TRUE))
-
-apa.cor.table(util_data, 
-              show.conf.interval = F,
-              filename = "utiltable.doc")
-describe(util_data, skew = TRUE, ranges = TRUE)
-
-util_data <- util_data %>%
-  mutate_if(is.factor, ~as.numeric(.))
+# --- Reliabilities ---
+valid_numeric <- valid_data %>%
+  mutate(across(all_of(c(belong_items, util_items)),
+                ~ as.numeric(factor(.x, levels = likert_levels, ordered = TRUE))))
 
 scoring_key <- list(
-  Belonging = c(
-    "Q14", "Q15", "Q21", "Q17", "Q18", "Q19", "Q20"
-  ),
-  Utility = c(
-    "Q22", "Q23", "Q24", "Q25", "Q26"
-  )
+  Belonging = belong_items,
+  Utility   = util_items
 )
 
-test <- scoreItems(
-  keys = scoring_key,
-  items = valid_data
-)
-test$alpha
+score_out <- scoreItems(keys = scoring_key, items = valid_numeric)
+score_out$alpha
 
-scale_data <- data %>%
-  select(
-    Q14,
-    Q15,
-    Q17,
-    Q18,
-    Q19,
-    Q20,
-    Q22,
-    Q23,
-    Q24,
-    Q25,
-    Q26
-  )
-scale_data[] <- lapply(scale_data, as.numeric)
+# Alpha on full scale
+scale_items <- c("Q14","Q15","Q17","Q18","Q19","Q20","Q22","Q23","Q24","Q25","Q26")
+scale_data <- valid_numeric %>% select(all_of(scale_items))
+psych::alpha(scale_data, warnings = TRUE, check.keys = TRUE)
 
-psych::alpha(scale_data, warnings = T, check.keys = T)
-
-# Other Scale Descriptives
+# --- Reliabilities for other scales ---
+ Political efficacy 
+effic_items <- paste0("Q29_", 1:4)
 effic_data <- valid_data %>%
-  select(Q29_1:Q29_4)
-effic_data <- effic_data %>%
-  mutate(across(everything(), ~ as.numeric((.))))
-apa.cor.table(effic_data, 
-              show.conf.interval = F)
+  select(all_of(effic_items)) %>%
+  mutate(across(everything(), ~ as.numeric(.x)))
+
+apa.cor.table(effic_data, show.conf.interval = FALSE)
 psych::alpha(effic_data)
 
+# Community Connectedness
+cc_items <- paste0("Q28_", 1:8)
 cc_data <- valid_data %>%
-  select(Q28_1:Q28_8)
-cc_data <- cc_data %>%
-  mutate(across(everything(), ~ as.numeric((.))))
-apa.cor.table(cc_data, 
-              show.conf.interval = F,
+  select(all_of(cc_items)) %>%
+  mutate(across(everything(), ~ as.numeric(.x)))
+
+apa.cor.table(cc_data,
+              show.conf.interval = FALSE,
               filename = "cctable.doc")
 
+# BACA 
+baca_items <- paste0("Q30_", 1:6)
 baca_data <- valid_data %>%
-  select(Q30_1:Q30_6)
-baca_data <- baca_data %>%
-  mutate(across(everything(), ~ as.numeric((.))))
+  select(all_of(baca_items)) %>%
+  mutate(across(everything(), ~ as.numeric(.x)))
+
 psych::alpha(baca_data)
-apa.cor.table(baca_data, 
-              show.conf.interval = F,
+apa.cor.table(baca_data,
+              show.conf.interval = FALSE,
               filename = "bacatable.doc")
+
+baca_data <- baca_data %>%
+  mutate(baca_score = rowMeans(across(all_of(baca_items)), na.rm = TRUE))
+
 baca_data <- baca_data %>%
   mutate(util_score = rowMeans(select(., Q30_1:Q30_6), na.rm = TRUE))
